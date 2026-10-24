@@ -18,7 +18,7 @@ const
     return process.platform === 'win32' ? 'type' : 'cat'
   },
 
-  getPiperTTSFilePath = () => {
+  getPiperTTSOverridePath = () => {
     const ttsExecutable = getBinPath(getTTSExecutable())
     if(fs.existsSync(ttsExecutable)) {
       return ttsExecutable
@@ -29,7 +29,30 @@ const
       return ttsScript
     }
 
+    return null
+  },
+
+  getPiperTTSBinaryPath = () => {
     return path.join(getExtraResourcesPath(), 'piper', process.platform, process.arch, getPiperTTSFileName())
+  },
+
+  getPiperTTSRuntimePath = () => {
+    return path.join(getExtraResourcesPath(), 'piper', 'darwin', process.arch, 'python', 'bin', 'python3')
+  },
+
+  getPiperTTSAdapterPath = () => {
+    return path.join(getExtraResourcesPath(), 'piper', 'darwin', 'piper_json.py')
+  },
+
+  getPiperTTSInvocation = (voiceName, voiceSpeaker) => {
+    const model = ' --model "' + getPiperTTSVoicePath(voiceName) + '" --speaker ' + voiceSpeaker
+    const ttsOverride = getPiperTTSOverridePath()
+
+    if(!ttsOverride && process.platform === 'darwin') {
+      return '"' + getPiperTTSRuntimePath() + '" "' + getPiperTTSAdapterPath() + '"' + model
+    }
+
+    return '"' + (ttsOverride || getPiperTTSBinaryPath()) + '" --quiet' + model + ' --json-input'
   },
 
   getPiperTTSVoiceNameToPath = (name) => {
@@ -47,7 +70,7 @@ const
   piperTTS = (pathJson, voiceName, voiceSpeaker) => {
     return new Promise((resolve, reject) => {
       exec(
-        getPiperTTSCommand() + ' "' + pathJson + '" | "' + getPiperTTSFilePath() + '" --quiet --model "' + getPiperTTSVoicePath(voiceName) + '" --speaker ' + voiceSpeaker + ' --json-input',
+        getPiperTTSCommand() + ' "' + pathJson + '" | ' + getPiperTTSInvocation(voiceName, voiceSpeaker),
         (error, stdout, stderr) => {
           if (error) {
             reject(error.toString())
