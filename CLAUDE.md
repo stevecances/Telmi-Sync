@@ -90,7 +90,7 @@ runProcess(mainWindow, path.join('Store', 'StoreDownload.js'), [param],
   - `averageRating` (float | null), `recommendedAge` (int | null), `reviewsCount` (int) : **agrégats issus de podcasts.telmi.fr**.
   - `dataUrl` : URL raw GitHub du JSON détaillé du podcast (repo public `DantSu/telmi-rss-feed-podcasts`, `podcasts/{slug}.json`) contenant le tableau `reviews[]` complet : `{ stars, comment, authorName, minAge, createdAt }` (+ les mêmes agrégats).
 - **Histoires / musique locales** : dossiers de l'utilisateur (`getStoriesPath()`, `getMusicPath()`, `getTmpPath()`, `initTmpPath()`, ...).
-- **TTS** : Piper — binaires dans `extraResources/` (copiés au build, `getExtraResourcesPath()`).
+- **TTS** : Piper — binaires dans `extraResources/piper/<platform>/` (copiés au build, `getExtraResourcesPath()`). Sur macOS, le moteur tourne avec un runtime Python embarqué (`extraResources/piper/darwin/<arch>/python`, `piper-tts`) installé par `scripts/fetch-piper-runtime.sh` et non versionné ; `extraResources/piper/darwin/piper_json.py` fait le lien avec l'app.
 - **Carte SD / Telmi OS** : détection via `drivelist`, formatage FAT32, etc.
 
 ## Conventions de développement
@@ -106,6 +106,7 @@ runProcess(mainWindow, path.join('Store', 'StoreDownload.js'), [param],
 ## Commandes
 ```bash
 yarn               # installation
+yarn piper:fetch   # macOS : installe le runtime Piper (à lancer une fois, requis par yarn start sur Mac)
 yarn start         # dev : react-scripts (localhost:3000) + electron
 yarn build         # build Windows x64
 yarn build:mac     # build macOS x64 + arm64
