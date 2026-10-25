@@ -101,7 +101,9 @@ runProcess(mainWindow, path.join('Store', 'StoreDownload.js'), [param],
   - Commits : **anglais** (impératif).
 - **Style JS** : pas de point-virgule, guillemets simples, indentation 2 espaces, imports ESM avec extension `.js` explicite.
 - **Plans** : `documents/plans/` (⚠️ le dossier `documents/` est gitignoré dans ce repo (repo public)).
-- **Pas de CI/CD** : releases manuelles via electron-builder.
+- **CI/CD** : `.github/workflows/ci.yml` se lance à chaque push. Il lint et compile (Linux). Sur `master`, le job `version-check` lance `scripts/check-release.mjs` : si la version de `package.json` est nouvelle (ni tag ni release existants, et supérieure à la dernière release), le job `approve` attend une validation manuelle (environnement `release`). Les 5 artefacts sont alors construits, puis publiés dans une release GitHub.
+- **Désactivation d'ESLint** : `DISABLE_ESLINT_PLUGIN=true` n'est défini que dans le workflow CI, pour que `react-scripts build` ne bloque pas sur les warnings. Ne pas l'ajouter aux scripts de `package.json` ni à l'environnement de dev. Le lint passe par `yarn lint` (plafond `--max-warnings 6`).
+- **Tags de release** : sans préfixe `v` (`Update.js` compare `tag_name` directement).
 
 ## Commandes
 ```bash
@@ -110,6 +112,7 @@ yarn start         # dev : react-scripts (localhost:3000) + electron
 yarn build         # build Windows x64
 yarn build:mac     # build macOS x64 + arm64
 yarn build:linux   # build Linux x64 + arm64
+yarn lint          # ESLint (src + public), plafond de 6 warnings
 ```
 
 ### Piper macOS : recompiler `piper` (manuel, hors build)

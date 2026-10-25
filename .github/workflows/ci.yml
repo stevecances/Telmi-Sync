@@ -1,0 +1,112 @@
+name: CI & Release
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn lint
+      - run: yarn react-scripts build
+        env:
+          DISABLE_ESLINT_PLUGIN: 'true'
+      - run: yarn electron-builder --linux --dir --x64 --publish never
+
+  version-check:
+    needs: compile
+    if: github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    outputs:
+      new: ${{ steps.check.outputs.new }}
+      version: ${{ steps.check.outputs.version }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - id: check
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node scripts/check-release.mjs
+
+  approve:
+    needs: [compile, version-check]
+    if: needs.version-check.outputs.new == 'true'
+    runs-on: ubuntu-latest
+    environment: release
+    steps:
+      - run: echo "Release ${{ needs.version-check.outputs.version }} approuvée"
+
+  build:
+    needs: [version-check, approve]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: mac-arm64
+            os: macos-latest
+            cmd: yarn electron-builder --mac --arm64 --publish never -c.mac.artifactName='${productName}-${version}-arm64.${ext}'
+            files: electron/dist/*.dmg
+          - name: mac-x64
+            os: macos-latest
+            cmd: yarn electron-builder --mac --x64 --publish never -c.mac.artifactName='${productName}-${version}-x64.${ext}'
+            files: electron/dist/*.dmg
+          - name: windows-x64
+            os: windows-2022
+            cmd: yarn electron-builder --win --x64 --publish never
+            files: electron/dist/*.exe
+          - name: linux-x64
+            os: ubuntu-latest
+            cmd: yarn electron-builder --linux --x64 --publish never -c.linux.artifactName='${productName}-${version}-x64.${ext}'
+            files: electron/dist/*.AppImage
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            cmd: yarn electron-builder --linux --arm64 --publish never -c.linux.artifactName='${productName}-${version}-arm64.${ext}'
+            files: electron/dist/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: yarn
+      - run: yarn install --frozen-lockfile
+      - run: yarn react-scripts build
+        env:
+          DISABLE_ESLINT_PLUGIN: 'true'
+      - run: ${{ matrix.cmd }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: ${{ matrix.files }}
+          retention-days: 1
+          if-no-files-found: error
+
+  publish:
+    needs: [version-check, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+      VERSION: ${{ needs.version-check.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - run: gh release create "$VERSION" --draft --target "$GITHUB_SHA" --title "Telmi Sync $VERSION" --generate-notes
+      - run: gh release upload "$VERSION" dist/*
+      - run: gh release edit "$VERSION" --draft=false
